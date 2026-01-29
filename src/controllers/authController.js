@@ -1,5 +1,5 @@
-const { prisma } = require("../utils/prisma");
-const {
+import { prisma } from "../utils/prisma.js";
+import {
     hashPassword,
     verifyUserCredentials,
     generateToken,
@@ -7,9 +7,9 @@ const {
     validateEmail,
     validatePassword,
     getClientIP
-} = require("../utils/auth");
+} from "../utils/auth.js";
 
-async function register(req, res) {
+export async function register(req, res) {
     try {
         const { email, username, password, first_name, last_name } = req.body;
 
@@ -106,7 +106,7 @@ async function register(req, res) {
     }
 }
 
-async function login(req, res) {
+export async function login(req, res) {
     try {
         const { email, password } = req.body;
 
@@ -164,7 +164,7 @@ async function login(req, res) {
     }
 }
 
-async function getMe(req, res) {
+export async function getMe(req, res) {
     try {
         const fullUser = await prisma.user.findUnique({
             where: { id: req.user.id },
@@ -210,9 +210,3 @@ async function getMe(req, res) {
         });
     }
 }
-
-module.exports = {
-    register,
-    login,
-    getMe,
-};

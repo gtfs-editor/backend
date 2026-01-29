@@ -1,16 +1,16 @@
-const {
+import {
     verifyToken,
     extractTokenFromHeader,
     checkProjectAccess,
     getClientIP,
     sanitizeUser
-} = require("../utils/auth");
-const { prisma } = require("../utils/prisma");
+} from "../utils/auth.js";
+import { prisma } from "../utils/prisma.js";
 
 /**
  * Authenticate User Middleware
  */
-async function authenticateUser(req) {
+export async function authenticateUser(req) {
     const authHeader = req.headers.authorization;
     const token = extractTokenFromHeader(authHeader);
 
@@ -31,7 +31,7 @@ async function authenticateUser(req) {
 /**
  * Express Middleware: Require Authentication
  */
-async function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
     try {
         const user = await authenticateUser(req);
         if (!user) {
@@ -56,7 +56,7 @@ async function requireAuth(req, res, next) {
 /**
  * Express Middleware: Optional Authentication
  */
-async function optionalAuth(req, res, next) {
+export async function optionalAuth(req, res, next) {
     try {
         const user = await authenticateUser(req);
         req.user = user || null;
@@ -70,7 +70,7 @@ async function optionalAuth(req, res, next) {
 /**
  * Express Middleware: Rate Limit
  */
-function rateLimitMiddleware(limiter) {
+export function rateLimitMiddleware(limiter) {
     return (req, res, next) => {
         const ip = getClientIP(req);
         if (!limiter.isAllowed(ip)) {
@@ -83,9 +83,3 @@ function rateLimitMiddleware(limiter) {
         next();
     };
 }
-
-module.exports = {
-    requireAuth,
-    optionalAuth,
-    rateLimitMiddleware,
-};

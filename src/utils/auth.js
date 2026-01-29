@@ -1,7 +1,8 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const { prisma } = require("./prisma");
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import 'dotenv/config';
+import { prisma } from "./prisma.js";
 
 // Environment variables validation
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -16,7 +17,7 @@ if (!JWT_SECRET) {
 /**
  * Hash a password using bcrypt
  */
-async function hashPassword(password) {
+export async function hashPassword(password) {
     try {
         const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         return hash;
@@ -28,7 +29,7 @@ async function hashPassword(password) {
 /**
  * Verify password against hash
  */
-async function verifyPassword(password, hash) {
+export async function verifyPassword(password, hash) {
     try {
         return await bcrypt.compare(password, hash);
     } catch (error) {
@@ -39,7 +40,7 @@ async function verifyPassword(password, hash) {
 /**
  * Generate JWT token for user
  */
-function generateToken(user) {
+export function generateToken(user) {
     if (!user.id) {
         throw new Error("User ID is required for token generation");
     }
@@ -55,7 +56,7 @@ function generateToken(user) {
 /**
  * Verify JWT token
  */
-function verifyToken(token) {
+export function verifyToken(token) {
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
 
@@ -76,7 +77,7 @@ function verifyToken(token) {
 /**
  * Extract token from Authorization header
  */
-function extractTokenFromHeader(authHeader) {
+export function extractTokenFromHeader(authHeader) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return null;
     }
@@ -86,7 +87,7 @@ function extractTokenFromHeader(authHeader) {
 /**
  * Verify user credentials for login
  */
-async function verifyUserCredentials(emailOrUsername, password) {
+export async function verifyUserCredentials(emailOrUsername, password) {
     try {
         const user = await prisma.user.findFirst({
             where: {
@@ -120,7 +121,7 @@ async function verifyUserCredentials(emailOrUsername, password) {
 /**
  * Check if user has access to a specific project
  */
-async function checkProjectAccess(userId, projectId, minimumRole = "VIEWER") {
+export async function checkProjectAccess(userId, projectId, minimumRole = "VIEWER") {
     try {
         if (!userId || !projectId) {
             return { hasAccess: false, role: null, project: null };
@@ -177,14 +178,14 @@ async function checkProjectAccess(userId, projectId, minimumRole = "VIEWER") {
 /**
  * Generate secure random token
  */
-function generateSecureToken(length = 32) {
+export function generateSecureToken(length = 32) {
     return crypto.randomBytes(length).toString("hex");
 }
 
 /**
  * Validate password strength
  */
-function validatePassword(password) {
+export function validatePassword(password) {
     const errors = [];
 
     if (!password) {
@@ -218,7 +219,7 @@ function validatePassword(password) {
 /**
  * Validate email format
  */
-function validateEmail(email) {
+export function validateEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
 }
@@ -226,7 +227,7 @@ function validateEmail(email) {
 /**
  * Sanitize user data
  */
-function sanitizeUser(user) {
+export function sanitizeUser(user) {
     const { password_hash, ...sanitizedUser } = user;
     return sanitizedUser;
 }
@@ -264,35 +265,17 @@ class RateLimiter {
     }
 }
 
-const loginRateLimiter = new RateLimiter(15 * 60 * 1000, 5);
-const registerRateLimiter = new RateLimiter(60 * 60 * 1000, 3);
-const passwordResetRateLimiter = new RateLimiter(60 * 60 * 1000, 3);
+export const loginRateLimiter = new RateLimiter(15 * 60 * 1000, 5);
+export const registerRateLimiter = new RateLimiter(60 * 60 * 1000, 3);
+export const passwordResetRateLimiter = new RateLimiter(60 * 60 * 1000, 3);
 
 /**
  * Get client IP address
  */
-function getClientIP(req) {
+export function getClientIP(req) {
     const forwarded = req.headers["x-forwarded-for"];
     const real = req.headers["x-real-ip"];
     if (forwarded) return forwarded.split(",")[0].trim();
     if (real) return real.trim();
     return req.socket.remoteAddress || "unknown";
 }
-
-module.exports = {
-    hashPassword,
-    verifyPassword,
-    generateToken,
-    verifyToken,
-    extractTokenFromHeader,
-    verifyUserCredentials,
-    checkProjectAccess,
-    generateSecureToken,
-    validatePassword,
-    validateEmail,
-    sanitizeUser,
-    loginRateLimiter,
-    registerRateLimiter,
-    passwordResetRateLimiter,
-    getClientIP,
-};

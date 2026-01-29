@@ -1,0 +1,593 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ================================
+// USER MANAGEMENT MODELS
+// ================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  password_hash String
+  avatar_url    String?
+  first_name    String?
+  last_name     String?
+  is_active     Boolean   @default(true)
+  is_verified   Boolean   @default(false)
+  last_login    DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  // User preferences
+  preferences UserPreferences?
+
+  // User projects and shares
+  ownedProjects   UserProject[]   @relation("ProjectOwner")
+  sharedProjects  ProjectShare[]  @relation("SharedWithUser")
+  invitedProjects ProjectInvite[] @relation("InvitedUser")
+
+  // Password reset tokens
+  passwordResets PasswordReset[]
+
+  // User sessions
+  sessions UserSession[]
+
+  @@index([email])
+  @@index([username])
+  @@index([created_at])
+}
+
+model UserPreferences {
+  id               String   @id @default(uuid())
+  user_id          String   @unique
+  theme            String   @default("system") // light, dark, system
+  language         String   @default("en")
+  timezone         String   @default("UTC")
+  map_default_lat  Float    @default(-6.175389)
+  map_default_lon  Float    @default(106.827139)
+  map_default_zoom Int      @default(13)
+  table_page_size  Int      @default(10)
+  notifications    Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model UserProject {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  owner_id    String
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  owner   User            @relation("ProjectOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  shares  ProjectShare[]
+  invites ProjectInvite[]
+
+  // GTFS Data Relations
+  agencies       Agency[]
+  stops          Stop[]
+  routes         Route[]
+  trips          Trip[]
+  stopTimes      StopTime[]
+  calendars      Calendar[]
+  calendarDates  CalendarDate[]
+  fareAttributes FareAttribute[]
+  fareRules      FareRule[]
+  shapes         Shape[]
+  transfers      Transfer[]
+  frequencies    Frequency[]
+  levels         Level[]
+  pathways       Pathway[]
+  feedInfo       FeedInfo[]
+
+  @@index([owner_id])
+  @@index([created_at])
+  @@index([name])
+}
+
+model ProjectShare {
+  id         String      @id @default(uuid())
+  project_id String
+  user_id    String
+  role       ProjectRole @default(VIEWER)
+  shared_by  String
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+
+  project UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user    User        @relation("SharedWithUser", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, user_id])
+  @@index([project_id])
+  @@index([user_id])
+}
+
+model ProjectInvite {
+  id          String      @id @default(uuid())
+  project_id  String
+  email       String
+  user_id     String? // null if user doesn't exist yet
+  role        ProjectRole @default(VIEWER)
+  token       String      @unique
+  invited_by  String
+  expires_at  DateTime
+  accepted_at DateTime?
+  created_at  DateTime    @default(now())
+
+  project UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user    User?       @relation("InvitedUser", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([project_id])
+  @@index([email])
+  @@index([expires_at])
+}
+
+model PasswordReset {
+  id         String    @id @default(uuid())
+  user_id    String
+  token      String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([user_id])
+  @@index([expires_at])
+}
+
+model UserSession {
+  id            String   @id @default(uuid())
+  user_id       String
+  session_token String   @unique
+  expires_at    DateTime
+  user_agent    String?
+  ip_address    String?
+  created_at    DateTime @default(now())
+  last_active   DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([session_token])
+  @@index([user_id])
+  @@index([expires_at])
+}
+
+enum ProjectRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+// ================================
+// UPDATED GTFS MODELS WITH USER CONTEXT
+// ================================
+
+model Agency {
+  id              String  @id @default(uuid())
+  agency_id       String  @unique
+  agency_name     String
+  agency_url      String
+  agency_timezone String
+  agency_lang     String?
+  agency_phone    String?
+  agency_fare_url String?
+  agency_email    String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project        UserProject     @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  routes         Route[]
+  fareAttributes FareAttribute[]
+
+  @@unique([agency_id, project_id])
+  @@index([agency_name])
+  @@index([project_id])
+}
+
+model Stop {
+  id                  String  @id @default(uuid())
+  stop_id             String  @unique
+  stop_code           String?
+  stop_name           String
+  stop_desc           String?
+  stop_lat            Float
+  stop_lon            Float
+  zone_id             String?
+  stop_url            String?
+  location_type       Int?    @default(0)
+  wheelchair_boarding Int?    @default(0)
+  parent_station      String?
+  platform_code       String?
+  level_id            String?
+  tts_stop_name       String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project     UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  stopTimes   StopTime[]
+  transfers   Transfer[]  @relation("FromStop")
+  transfersTo Transfer[]  @relation("ToStop")
+  pathways    Pathway[]   @relation("FromStop")
+  pathwaysTo  Pathway[]   @relation("ToStop")
+  parentStop  Stop?       @relation("ParentChild", fields: [parent_station], references: [stop_id])
+  childStops  Stop[]      @relation("ParentChild")
+  level       Level?      @relation(fields: [level_id], references: [level_id])
+
+  @@unique([stop_id, project_id])
+  @@index([stop_name])
+  @@index([stop_lat, stop_lon])
+  @@index([parent_station])
+  @@index([zone_id])
+  @@index([project_id])
+}
+
+model Route {
+  id                  String  @id @default(uuid())
+  route_id            String  @unique
+  agency_id           String?
+  route_short_name    String?
+  route_long_name     String?
+  route_desc          String?
+  route_type          Int
+  route_url           String?
+  route_color         String? @default("FFFFFF")
+  route_text_color    String? @default("000000")
+  route_sort_order    Int?
+  continuous_pickup   Int?    @default(1)
+  continuous_drop_off Int?    @default(1)
+  network_id          String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project   UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  agency    Agency?     @relation(fields: [agency_id], references: [agency_id])
+  trips     Trip[]
+  fareRules FareRule[]
+
+  @@unique([route_id, project_id])
+  @@index([route_type])
+  @@index([agency_id])
+  @@index([project_id])
+}
+
+model Trip {
+  id                    String  @id @default(uuid())
+  trip_id               String  @unique
+  route_id              String
+  service_id            String
+  trip_headsign         String?
+  trip_short_name       String?
+  direction_id          Int?    @default(0)
+  block_id              String?
+  shape_id              String?
+  wheelchair_accessible Int?    @default(0)
+  bikes_allowed         Int?    @default(0)
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project   UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  route     Route       @relation(fields: [route_id], references: [route_id])
+  calendar  Calendar?   @relation(fields: [service_id], references: [service_id])
+  stopTimes StopTime[]
+
+  @@unique([trip_id, project_id])
+  @@index([route_id])
+  @@index([service_id])
+  @@index([shape_id])
+  @@index([project_id])
+}
+
+model StopTime {
+  id                  String  @id @default(uuid())
+  trip_id             String
+  stop_id             String
+  arrival_time        String?
+  departure_time      String?
+  stop_sequence       Int
+  stop_headsign       String?
+  pickup_type         Int?    @default(0)
+  drop_off_type       Int?    @default(0)
+  continuous_pickup   Int?
+  continuous_drop_off Int?
+  shape_dist_traveled Float?
+  timepoint           Int?    @default(1)
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  trip    Trip        @relation(fields: [trip_id], references: [trip_id], onDelete: Cascade)
+  stop    Stop        @relation(fields: [stop_id], references: [stop_id])
+
+  @@unique([trip_id, stop_sequence, project_id])
+  @@index([trip_id])
+  @@index([stop_id])
+  @@index([arrival_time])
+  @@index([departure_time])
+  @@index([project_id])
+}
+
+model Calendar {
+  id         String @id @default(uuid())
+  service_id String @unique
+  monday     Int
+  tuesday    Int
+  wednesday  Int
+  thursday   Int
+  friday     Int
+  saturday   Int
+  sunday     Int
+  start_date String
+  end_date   String
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project    UserProject    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  trips      Trip[]
+  exceptions CalendarDate[]
+
+  @@unique([service_id, project_id])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([project_id])
+}
+
+model CalendarDate {
+  id             String @id @default(uuid())
+  service_id     String
+  date           String
+  exception_type Int
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project  UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  calendar Calendar    @relation(fields: [service_id], references: [service_id])
+
+  @@unique([service_id, date, project_id])
+  @@index([date])
+  @@index([project_id])
+}
+
+model FareAttribute {
+  id                String  @id @default(uuid())
+  fare_id           String  @unique
+  price             Float
+  currency_type     String
+  payment_method    Int
+  transfers         Int?
+  agency_id         String?
+  transfer_duration Int?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project   UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  agency    Agency?     @relation(fields: [agency_id], references: [agency_id])
+  fareRules FareRule[]
+
+  @@unique([fare_id, project_id])
+  @@index([project_id])
+}
+
+model FareRule {
+  id             String  @id @default(uuid())
+  fare_id        String
+  route_id       String?
+  origin_id      String?
+  destination_id String?
+  contains_id    String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project        UserProject   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  fare_attribute FareAttribute @relation(fields: [fare_id], references: [fare_id])
+  route          Route?        @relation(fields: [route_id], references: [route_id])
+
+  @@index([project_id])
+}
+
+model Shape {
+  id                  String @id @default(uuid())
+  shape_id            String
+  shape_pt_sequence   Int
+  shape_pt_lat        Float
+  shape_pt_lon        Float
+  shape_dist_traveled Float?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([shape_id, shape_pt_sequence, project_id])
+  @@index([shape_id])
+  @@index([project_id])
+}
+
+model Transfer {
+  id                String @id @default(uuid())
+  from_stop_id      String
+  to_stop_id        String
+  transfer_type     Int    @default(0)
+  min_transfer_time Int?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project  UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  fromStop Stop        @relation("FromStop", fields: [from_stop_id], references: [stop_id])
+  toStop   Stop        @relation("ToStop", fields: [to_stop_id], references: [stop_id])
+
+  @@unique([from_stop_id, to_stop_id, project_id])
+  @@index([from_stop_id])
+  @@index([to_stop_id])
+  @@index([project_id])
+}
+
+model Frequency {
+  id           String @id @default(uuid())
+  trip_id      String @unique
+  start_time   String
+  end_time     String
+  headway_secs Int
+  exact_times  Int?   @default(0)
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([trip_id])
+  @@index([start_time])
+  @@index([project_id])
+}
+
+model Level {
+  id          String  @id @default(uuid())
+  level_id    String  @unique
+  level_index Float
+  level_name  String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project  UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  stops    Stop[]
+  pathways Pathway[]   @relation("LevelToPathway")
+
+  @@unique([level_id, project_id])
+  @@index([project_id])
+}
+
+model Pathway {
+  id                     String  @id @default(uuid())
+  pathway_id             String
+  from_stop_id           String
+  to_stop_id             String
+  pathway_mode           Int
+  is_bidirectional       Int
+  length                 Float?
+  traversal_time         Int?
+  stair_count            Int?
+  max_slope              Float?
+  min_width              Float?
+  signposted_as          String?
+  reversed_signposted_as String?
+  level_id               String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project  UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  fromStop Stop        @relation("FromStop", fields: [from_stop_id], references: [stop_id], onDelete: Cascade)
+  toStop   Stop        @relation("ToStop", fields: [to_stop_id], references: [stop_id], onDelete: Cascade)
+  level    Level?      @relation("LevelToPathway", fields: [level_id], references: [level_id], onDelete: SetNull)
+
+  @@unique([pathway_id, project_id])
+  @@index([from_stop_id])
+  @@index([to_stop_id])
+  @@index([level_id])
+  @@index([project_id])
+}
+
+model FeedInfo {
+  id                  String  @id @default(uuid())
+  feed_publisher_name String
+  feed_publisher_url  String
+  feed_lang           String
+  default_lang        String?
+  feed_start_date     String?
+  feed_end_date       String?
+  feed_version        String?
+  feed_contact_email  String?
+  feed_contact_url    String?
+
+  // User context fields
+  project_id String
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  project UserProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id])
+}

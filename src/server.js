@@ -1,10 +1,12 @@
-const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
-const dotenv = require('dotenv');
-const cookieParser = require('cookie-parser');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import authRoutes from './routes/authRoutes.js';
+import routeRoutes from './routes/routeRoutes.js';
 
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +21,8 @@ app.use(cookieParser());
 app.use(morgan('dev'));
 
 // Routes
-app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/auth', authRoutes);
+app.use('/api/route', routeRoutes);
 
 app.get('/', (req, res) => {
     res.json({ message: 'GTFS Backend API is running' });
