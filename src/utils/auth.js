@@ -265,7 +265,7 @@ class RateLimiter {
     }
 }
 
-export const loginRateLimiter = new RateLimiter(15 * 60 * 1000, 5);
+export const loginRateLimiter = new RateLimiter(60 * 1000, 500);
 export const registerRateLimiter = new RateLimiter(60 * 60 * 1000, 3);
 export const passwordResetRateLimiter = new RateLimiter(60 * 60 * 1000, 3);
 

@@ -5,8 +5,8 @@ import { loginRateLimiter, registerRateLimiter } from '../utils/auth.js';
 
 const router = express.Router();
 
-router.post('/register', rateLimitMiddleware(registerRateLimiter), register);
 router.post('/login', rateLimitMiddleware(loginRateLimiter), login);
+// router.post('/login', login);
 router.get('/me', requireAuth, getMe);
 
 export default router;

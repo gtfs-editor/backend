@@ -83,3 +83,59 @@ export function rateLimitMiddleware(limiter) {
         next();
     };
 }
+
+/**
+ * Express Middleware: Require Project Access
+ * This middleware assumes that authenticateUser (requireAuth) has already run and req.user is set.
+ */
+export function requireProjectAccess(minimumRole = "VIEWER") {
+    return async (req, res, next) => {
+        try {
+            // Get project ID from params or query or body
+            const projectId = req.params.projectId || req.params.id || req.body.projectId || req.query.projectId;
+
+            if (!projectId) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Project ID is required",
+                    error: "BAD_REQUEST"
+                });
+            }
+
+            if (!req.user) {
+                // Should encounter this case only if requireAuth wasn't used prior
+                const user = await authenticateUser(req);
+                if (!user) {
+                    return res.status(401).json({
+                        success: false,
+                        message: "Authentication required",
+                        error: "UNAUTHORIZED"
+                    });
+                }
+                req.user = user;
+            }
+
+            const accessResult = await checkProjectAccess(req.user.id, projectId, minimumRole);
+
+            if (!accessResult.hasAccess) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Access denied. Insufficient project permissions.",
+                    error: "FORBIDDEN"
+                });
+            }
+
+            // Attach project and role to request for controllers to use
+            req.project = accessResult.project;
+            req.projectRole = accessResult.role;
+            next();
+        } catch (error) {
+            console.error("Project Access Middleware Error:", error);
+            res.status(500).json({
+                success: false,
+                message: "Internal server error during authorization",
+                error: "INTERNAL_ERROR"
+            });
+        }
+    };
+}

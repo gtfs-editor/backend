@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
+import projectRoutes from './routes/projectRoutes.js';
 
 
 
@@ -22,6 +23,7 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
 app.use('/api/route', routeRoutes);
 
 app.get('/', (req, res) => {
