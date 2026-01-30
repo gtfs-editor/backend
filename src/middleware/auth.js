@@ -12,18 +12,28 @@ import { prisma } from "../utils/prisma.js";
  */
 export async function authenticateUser(req) {
     const authHeader = req.headers.authorization;
+    // console.log("[Auth] Header:", authHeader ? authHeader.substring(0, 20) + '...' : 'Missing');
     const token = extractTokenFromHeader(authHeader);
 
-    if (!token) return null;
+    if (!token) {
+        console.log("[Auth] No token extracted");
+        return null;
+    }
 
     const payload = verifyToken(token);
-    if (!payload || !payload.userId) return null;
+    if (!payload || !payload.userId) {
+        console.log("[Auth] Token verification failed");
+        return null;
+    }
 
     const user = await prisma.user.findUnique({
         where: { id: payload.userId },
     });
 
-    if (!user || !user.is_active) return null;
+    if (!user || !user.is_active) {
+        console.log("[Auth] User not found or inactive", user ? user.id : 'null');
+        return null;
+    }
 
     return user;
 }

@@ -182,6 +182,8 @@ export function generateSecureToken(length = 32) {
     return crypto.randomBytes(length).toString("hex");
 }
 
+export const generatePasswordResetToken = () => generateSecureToken(32);
+
 /**
  * Validate password strength
  */

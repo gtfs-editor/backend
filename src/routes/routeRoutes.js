@@ -1,8 +1,12 @@
 import express from 'express';
-import { getRoute } from '../controllers/routeController.js';
+import { getRouteById } from '../controllers/gtfsController.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/', getRoute);
+router.use(requireAuth);
+
+router.get('/:id', getRouteById);
+// router.get('/', getRoutes); // Optional: if we want to list all routes here too
 
 export default router;
