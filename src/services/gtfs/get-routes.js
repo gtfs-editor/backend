@@ -49,7 +49,7 @@ export async function getRouteById(projectId, routeId) {
         },
         include: {
             agency: true,
-            route_stops: {
+            routeStops: {
                 include: {
                     stop: true
                 },
@@ -66,8 +66,8 @@ export async function getRouteById(projectId, routeId) {
     // Process route_stops into directions object
     const directions = {};
 
-    if (route.route_stops && route.route_stops.length > 0) {
-        route.route_stops.forEach(rs => {
+    if (route.routeStops && route.routeStops.length > 0) {
+        route.routeStops.forEach(rs => {
             const dirId = rs.direction_id ?? 0;
             if (!directions[dirId]) {
                 directions[dirId] = [];
@@ -91,6 +91,6 @@ export async function getRouteById(projectId, routeId) {
         directions,
         available_directions: Object.keys(directions).map(id => parseInt(id, 10)),
         // Optional: Include summary info
-        total_stops: route.route_stops.length
+        total_stops: route.routeStops?.length || 0
     };
 }

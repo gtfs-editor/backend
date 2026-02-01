@@ -58,3 +58,15 @@ export async function getRouteStops(projectId, routeId) {
         orderBy: [{ direction_id: 'asc' }, { stop_sequence: 'asc' }]
     })
 }
+
+export async function getRouteStopsByDirection(projectId, routeId, directionId) {
+    return await prisma.routeStop.findMany({
+        where: {
+            route_id: routeId,
+            project_id: projectId,
+            direction_id: parseInt(directionId)
+        },
+        include: { stop: true },
+        orderBy: { stop_sequence: 'asc' }
+    })
+}

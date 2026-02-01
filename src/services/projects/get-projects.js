@@ -4,7 +4,9 @@ import { checkProjectAccess } from "../../utils/auth.js"
 // Get projects for a user
 export async function getProjects(userId, query = {}) {
     const { page = 1, limit = 10, search = "" } = query
-    const skip = (page - 1) * limit
+    const parsedLimit = Number(limit)
+    const parsedPage = Number(page)
+    const skip = (parsedPage - 1) * parsedLimit
 
     // Create search filter
     const searchFilter = search
@@ -25,7 +27,7 @@ export async function getProjects(userId, query = {}) {
             },
             orderBy: { updated_at: "desc" },
             skip,
-            take: limit,
+            take: parsedLimit,
             include: {
                 owner: {
                     select: {
@@ -64,7 +66,7 @@ export async function getProjects(userId, query = {}) {
             },
             orderBy: { created_at: "desc" },
             skip,
-            take: limit,
+            take: parsedLimit,
             include: {
                 project: {
                     include: {
@@ -96,10 +98,10 @@ export async function getProjects(userId, query = {}) {
     return {
         projects,
         pagination: {
-            page: Number(page),
-            limit: Number(limit),
+            page: parsedPage,
+            limit: parsedLimit,
             total: ownedCount + sharedCount,
-            pages: Math.ceil((ownedCount + sharedCount) / limit),
+            pages: Math.ceil((ownedCount + sharedCount) / parsedLimit),
         },
     }
 }

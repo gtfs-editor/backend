@@ -12,6 +12,7 @@ export async function createRoute(projectId, data) {
         route_text_color,
         route_sort_order,
         agency_id,
+        agency_name, // Support creating new agency when no agencies exist
         continuous_pickup,
         continuous_drop_off,
         network_id
@@ -42,8 +43,11 @@ export async function createRoute(projectId, data) {
         throw new Error("Route text color must be a 6-character hex color (without #)")
     }
 
-    // Verify agency exists if provided
+    // Resolve agency_id - handle both existing agency selection and new agency creation
+    let resolvedAgencyId = agency_id
+
     if (agency_id) {
+        // Verify existing agency exists
         const agency = await prisma.agency.findFirst({
             where: {
                 agency_id: agency_id,
@@ -54,6 +58,19 @@ export async function createRoute(projectId, data) {
         if (!agency) {
             throw new Error("Agency not found in this project")
         }
+    } else if (agency_name) {
+        // Create new agency when agency_name is provided but no agency_id
+        const newAgencyId = `agency-${Date.now()}`
+        const newAgency = await prisma.agency.create({
+            data: {
+                agency_id: newAgencyId,
+                agency_name: agency_name,
+                agency_url: "https://example.com", // Default placeholder URL
+                agency_timezone: "Asia/Jakarta", // Default timezone
+                project_id: projectId
+            }
+        })
+        resolvedAgencyId = newAgency.agency_id
     }
 
     // Generate route_id if not provided
@@ -70,7 +87,7 @@ export async function createRoute(projectId, data) {
             route_color: route_color || "FFFFFF",
             route_text_color: route_text_color || "000000",
             route_sort_order: route_sort_order ? parseInt(route_sort_order) : null,
-            agency_id,
+            agency_id: resolvedAgencyId,
             continuous_pickup: continuous_pickup ? parseInt(continuous_pickup) : 1,
             continuous_drop_off: continuous_drop_off ? parseInt(continuous_drop_off) : 1,
             network_id,

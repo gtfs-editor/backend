@@ -1,5 +1,7 @@
 import * as gtfsService from '../services/gtfs/index.js';
 
+// ============ UPLOAD & RESET ============
+
 export const uploadGTFS = async (req, res, next) => {
     try {
         const userId = req.user.id;
@@ -19,34 +21,30 @@ export const uploadGTFS = async (req, res, next) => {
     }
 };
 
-export const getRoutes = async (req, res, next) => {
+export const resetGTFS = async (req, res, next) => {
     try {
-        // We expect projectId to be passed in query or path, or attached to request if nested route
-        const project_id = req.query.project_id || req.params.id;
-        // NOTE: The previous service assumed filtering by project_id is mandatory or handled.
-        // My new service enforces it. If existing frontend doesn't send project_id, we need to know.
-        // Assuming project_id is sent in query for now.
+        const userId = req.user.id;
+        const { project_id } = req.body;
 
-        if (!project_id) {
-            throw new Error("Project ID is required");
-        }
-
-        const result = await gtfsService.getRoutes(project_id, req.query);
+        const result = await gtfsService.resetGTFS(userId, project_id);
         res.json({ success: true, ...result });
     } catch (error) {
         next(error);
     }
 };
 
-export const getStops = async (req, res, next) => {
+// ============ ROUTES ============
+
+export const getRoutes = async (req, res, next) => {
     try {
         const project_id = req.query.project_id || req.params.id;
+
         if (!project_id) {
             throw new Error("Project ID is required");
         }
 
-        const result = await gtfsService.getStops(project_id, req.query);
-        res.json({ success: true, ...result });
+        const result = await gtfsService.getRoutes(project_id, req.query);
+        res.json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
@@ -55,14 +53,14 @@ export const getStops = async (req, res, next) => {
 export const getRouteById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const project_id = req.query.project_id || req.params.id;
+        const project_id = req.query.project_id || req.body.project_id;
 
         if (!project_id) {
             throw new Error("Project ID is required");
         }
 
-        const result = await gtfsService.getRouteById(project_id, id);
-        res.json({ success: true, ...result });
+        const route = await gtfsService.getRouteById(project_id, id);
+        res.json({ success: true, data: route });
     } catch (error) {
         next(error);
     }
@@ -71,7 +69,7 @@ export const getRouteById = async (req, res, next) => {
 export const getRouteDetails = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const project_id = req.query.project_id || req.params.id;
+        const project_id = req.query.project_id || req.body.project_id;
 
         if (!project_id) {
             throw new Error("Project ID is required");
@@ -84,13 +82,234 @@ export const getRouteDetails = async (req, res, next) => {
     }
 };
 
-export const resetGTFS = async (req, res, next) => {
+export const createRoute = async (req, res, next) => {
     try {
+        const { project_id } = req.body;
         const userId = req.user.id;
-        const { project_id } = req.body; // Explicit confirmation
 
-        const result = await gtfsService.resetGTFS(userId, project_id);
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const route = await gtfsService.createRoute(project_id, req.body, userId);
+        res.status(201).json({ success: true, data: route });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const updateRoute = async (req, res, next) => {
+    try {
+        const { project_id } = req.body;
+        const routeId = req.params.routeId || req.params.id;
+        const userId = req.user.id;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const route = await gtfsService.updateRoute(project_id, routeId, req.body, userId);
+        res.json({ success: true, data: route });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const deleteRoute = async (req, res, next) => {
+    try {
+        const { project_id } = req.body;
+        const routeId = req.params.routeId || req.params.id;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const result = await gtfsService.deleteRoute(project_id, routeId);
         res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============ ROUTE STOPS ============
+
+export const getRouteStops = async (req, res, next) => {
+    try {
+        const project_id = req.query.project_id || req.params.id;
+        const { routeId } = req.params;
+        const { direction_id } = req.query;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        let result;
+
+        if (direction_id !== undefined) {
+            // Get stops for specific direction - return raw array
+            result = await gtfsService.getRouteStopsByDirection(
+                project_id,
+                routeId,
+                direction_id
+            );
+        } else {
+            // Get all stops - return raw array
+            result = await gtfsService.getRouteStops(project_id, routeId);
+        }
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+export const assignStopsToRoute = async (req, res, next) => {
+    try {
+        const { project_id, stops, direction_id = 0 } = req.body;
+        const { routeId } = req.params;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        if (!stops || !Array.isArray(stops)) {
+            throw new Error("Stops array is required");
+        }
+
+        const result = await gtfsService.assignStopsToRoute(
+            project_id,
+            routeId,
+            stops,
+            direction_id
+        );
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const clearRouteStops = async (req, res, next) => {
+    try {
+        const { project_id, direction_id } = req.body;
+        const { routeId } = req.params;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const result = await gtfsService.clearRouteStops(
+            project_id,
+            routeId,
+            direction_id
+        );
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const addStopToRoute = async (req, res, next) => {
+    try {
+        const { project_id, stop_id, direction_id = 0, stop_sequence } = req.body;
+        const { routeId } = req.params;
+
+        if (!project_id || !stop_id) {
+            throw new Error("Project ID and stop_id are required");
+        }
+
+        const result = await gtfsService.addStopToRoute(
+            project_id,
+            routeId,
+            stop_id,
+            direction_id,
+            stop_sequence
+        );
+
+        res.status(201).json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const removeStopFromRoute = async (req, res, next) => {
+    try {
+        const { project_id, direction_id } = req.body;
+        const { routeId, stopId } = req.params;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        if (direction_id === undefined) {
+            throw new Error("direction_id is required");
+        }
+
+        const result = await gtfsService.removeStopFromRoute(
+            project_id,
+            routeId,
+            stopId,
+            direction_id
+        );
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const reorderRouteStops = async (req, res, next) => {
+    try {
+        const { project_id, direction_id, stops } = req.body;
+        const { routeId } = req.params;
+
+        if (!project_id || direction_id === undefined || !stops) {
+            throw new Error("project_id, direction_id, and stops are required");
+        }
+
+        const result = await gtfsService.reorderRouteStops(
+            project_id,
+            routeId,
+            direction_id,
+            stops
+        );
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============ STOPS ============
+
+export const getStops = async (req, res, next) => {
+    try {
+        const project_id = req.query.project_id || req.params.id;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const result = await gtfsService.getStops(project_id, req.query);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getStopById = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const project_id = req.query.project_id || req.body.project_id;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const stop = await gtfsService.getStopById(project_id, id);
+        res.json({ success: true, data: stop });
     } catch (error) {
         next(error);
     }
@@ -98,16 +317,15 @@ export const resetGTFS = async (req, res, next) => {
 
 export const createStop = async (req, res, next) => {
     try {
-        // Project ID from path or body, depending on route
-        // Assuming route is /api/projects/:projectId/stops, so it might be attached to body by middleware or directly available
         const { project_id } = req.body;
+        const userId = req.user.id;
 
         if (!project_id) {
             throw new Error("Project ID is required");
         }
 
-        const result = await gtfsService.createStop(project_id, req.body);
-        res.status(201).json({ success: true, data: result });
+        const stop = await gtfsService.createStop(project_id, req.body, userId);
+        res.status(201).json({ success: true, data: stop });
     } catch (error) {
         next(error);
     }
@@ -115,16 +333,75 @@ export const createStop = async (req, res, next) => {
 
 export const updateStop = async (req, res, next) => {
     try {
-        const { project_id } = req.body; // Attached by middleware
-        // Fix: Use stopId from params if available (nested route), otherwise fallback to id
+        const { project_id } = req.body;
+        const stopId = req.params.stopId || req.params.id;
+        const userId = req.user.id;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const stop = await gtfsService.updateStop(project_id, stopId, req.body, userId);
+        res.json({ success: true, data: stop });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const deleteStop = async (req, res, next) => {
+    try {
+        const { project_id } = req.body;
         const stopId = req.params.stopId || req.params.id;
 
         if (!project_id) {
             throw new Error("Project ID is required");
         }
 
-        const result = await gtfsService.updateStop(project_id, stopId, req.body);
-        res.json({ success: true, data: result });
+        const result = await gtfsService.deleteStop(project_id, stopId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const searchStops = async (req, res, next) => {
+    try {
+        const project_id = req.query.project_id;
+        const { q, limit } = req.query;
+
+        if (!project_id) {
+            throw new Error("Project ID is required");
+        }
+
+        const stops = await gtfsService.searchStopsService(
+            project_id,
+            q,
+            limit ? parseInt(limit) : 10
+        );
+
+        res.json({ success: true, data: stops });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getStopsNearby = async (req, res, next) => {
+    try {
+        const project_id = req.query.project_id;
+        const { lat, lon, radius } = req.query;
+
+        if (!project_id || !lat || !lon) {
+            throw new Error("project_id, lat, and lon are required");
+        }
+
+        const stops = await gtfsService.getStopsNearby(
+            project_id,
+            parseFloat(lat),
+            parseFloat(lon),
+            radius ? parseFloat(radius) : 1
+        );
+
+        res.json({ success: true, data: stops });
     } catch (error) {
         next(error);
     }
@@ -135,6 +412,7 @@ export const updateStop = async (req, res, next) => {
 export const getTrips = async (req, res, next) => {
     try {
         const project_id = req.query.project_id || req.params.id;
+
         if (!project_id) {
             throw new Error("Project ID is required");
         }
@@ -198,6 +476,7 @@ export const updateTrip = async (req, res, next) => {
 export const getCalendar = async (req, res, next) => {
     try {
         const project_id = req.query.project_id || req.params.id;
+
         if (!project_id) {
             throw new Error("Project ID is required");
         }
@@ -245,6 +524,7 @@ export const updateCalendar = async (req, res, next) => {
 export const getFares = async (req, res, next) => {
     try {
         const project_id = req.query.project_id || req.params.id;
+
         if (!project_id) {
             throw new Error("Project ID is required");
         }
@@ -287,85 +567,12 @@ export const updateFare = async (req, res, next) => {
     }
 };
 
-// ============ ROUTES ============
-
-export const createRoute = async (req, res, next) => {
-    try {
-        const { project_id } = req.body;
-
-        if (!project_id) {
-            throw new Error("Project ID is required");
-        }
-
-        const result = await gtfsService.createRoute(project_id, req.body);
-        res.status(201).json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const assignStopsToRoute = async (req, res, next) => {
-    try {
-        const { project_id } = req.body; // MapProjectId middleware ensures this
-        const { routeId } = req.params;
-        const stops = req.body.stops; // Array of stops
-
-        if (!project_id) {
-            throw new Error("Project ID is required");
-        }
-
-        const result = await gtfsService.assignStopsToRoute(project_id, routeId, stops, req.body.direction_id || 0);
-        res.json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const getRouteStops = async (req, res, next) => {
-    try {
-        const { project_id } = req.query; // Or from params/auth context if standardized
-        const { routeId } = req.params;
-
-        if (!project_id && req.params.id) {
-            // Fallback if project_id not in query but in parent route param
-            // ideally passed via mapProjectId or query
-        }
-
-        // Actually, let's trust mapProjectId if we use it, or req.query like getStops
-        const pid = req.query.project_id || req.params.id;
-
-        if (!pid) {
-            throw new Error("Project ID is required");
-        }
-
-        const result = await gtfsService.getRouteStops(pid, routeId);
-        res.json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const updateRoute = async (req, res, next) => {
-    try {
-        const { project_id } = req.body;
-        const routeId = req.params.routeId || req.params.id;
-
-        if (!project_id) {
-            throw new Error("Project ID is required");
-        }
-
-        const result = await gtfsService.updateRoute(project_id, routeId, req.body);
-        res.json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
-};
-
 // ============ AGENCIES ============
 
 export const getAgencies = async (req, res, next) => {
     try {
         const project_id = req.query.project_id || req.params.id;
+
         if (!project_id) {
             throw new Error("Project ID is required");
         }
@@ -376,4 +583,3 @@ export const getAgencies = async (req, res, next) => {
         next(error);
     }
 };
-
