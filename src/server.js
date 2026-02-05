@@ -11,11 +11,11 @@ import publicRoutes from './routes/publicRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Vite default
+    origin: process.env.FRONTEND_URL, // Vite default
     credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
